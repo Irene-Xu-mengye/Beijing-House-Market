@@ -12,5 +12,5 @@ Housing price of Beijing from 2011 to 2017, fetching from Lianjia.com
 By: Qichen Qiu
 
 **Refereces**   
-https://www.kaggle.com/ruiqurm/lianjia
+https://www.kaggle.com/ruiqurm/lianjia  
 https://bj.lianjia.com/chengjiao
