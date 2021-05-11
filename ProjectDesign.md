@@ -1,2 +1,1 @@
-![architecture.jpg]
-![persona.jpg]
+![Architecture Diagram](architecture.jpg)
