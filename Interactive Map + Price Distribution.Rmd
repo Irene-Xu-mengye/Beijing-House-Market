@@ -1,0 +1,173 @@
+---
+title: "Beijing second house market"
+author: "Allison Xia"
+date: "2021/5/11"
+output:
+  html_document:
+    highlight: tango
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false 
+    df_print: kable
+---
+
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+# Set R chunk default options:
+# -do not output all R messages in html report
+# -do not output all R warnings in html report
+# -set default figure widths and heights for all code blocks, unless you 
+#  override them
+knitr::opts_chunk$set(
+  message = FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2
+)
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(leaflet)
+library(sf)
+library(ggmap)
+library(readr)
+library(XML)
+library(shiny)
+library(lubridate)
+library(plotly)
+```
+
+
+```{r, echo=FALSE}
+beijing_housing_price <- read_csv("data.csv") %>% 
+  mutate(year = as.character(year(tradeTime))) %>% 
+  mutate(district = case_when(district == 1 ~ "DongCheng",
+                              district == 2 ~ "FengTai",
+                              district == 3 ~ "DaXing",
+                              district == 4 ~ "FaXing",
+                              district == 5 ~ "FangShang",
+                              district == 6 ~ "ChangPing",
+                              district == 7 ~ "ChaoYang",
+                              district == 8 ~ "HaiDian",
+                              district == 9 ~ "ShiJingShan",
+                              district == 10 ~ "XiCheng",
+                              district == 11 ~ "TongZhou",
+                              district == 12 ~ "ShunYi",
+                              district == 13 ~ "MenTouGou"))
+```
+
+
+```{r, echo=FALSE}
+beijing_housing_price_2018 <- beijing_housing_price %>% 
+  filter(tradeTime >= "2018-1-1") %>% 
+  dplyr::mutate(price.level = cut(price, c(10000, 20000, 30000, 40000, 50000, 60000, 80000, 100000, 200000),
+                                
+                                labels = c("10000 ~ 20000",
+                                           "20000 ~ 30000",
+                                           "30000 ~ 40000",
+                                           "40000 ~ 50000",
+                                           "50000 ~ 60000",
+                                           "60000 ~ 80000",
+                                           "80000 ~ 100000",
+                                           "100000 ~ 200000"
+                                           )))
+```
+
+```{r}
+ggplot(beijing_housing_price_2018, aes(y = totalPrice)) +
+  geom_histogram(bins = 30)
+```
+
+```{r}
+ggplot(beijing_housing_price_2018, aes(y = price)) +
+  geom_histogram(bins = 30)
+```
+
+```{r}
+ggplot(beijing_housing_price_2018, aes(reorder(x= district, -price), y=price, color = district))+
+  geom_boxplot() + 
+  labs(title = "Prices In Function Of The District", y =" Price Per Sqft")+coord_flip() 
+```
+```{r}
+medians<- beijing_housing_price %>% 
+  group_by(year, district) %>% 
+  summarize(median = median(price)) 
+```
+
+```{r}
+line <-ggplot(data = medians, aes(x = as.numeric(year), y = median, color = district))+
+  geom_line()
+```
+
+```{r}
+ggplotly(line)
+```
+```{r}
+beijing_housing_price <- beijing_housing_price %>% 
+  mutate(district = case_when(district == 1 ~ "DongCheng",
+                              district == 2 ~ "FengTai",
+                              district == 3 ~ "DaXing",
+                              district == 4 ~ "FaXing",
+                              district == 5 ~ "FangShang",
+                              district == 6 ~ "ChangPing",
+                              district == 7 ~ "ChaoYang",
+                              district == 8 ~ "HaiDian",
+                              district == 9 ~ "ShiJingShan",
+                              district == 10 ~ "XiCheng",
+                              district == 11 ~ "TongZhou",
+                              district == 12 ~ "ShunYi",
+                              district == 13 ~ "MenTouGou"))
+```
+
+```{r, echo = FALSE}
+pal <- colorFactor(c("#dd3497",
+                     "#ae017e",
+                     "#7a0177",
+                     "#feebe2",
+                     "#fcc5c0",
+                     "#fa9fb5",
+                     "#f768a1"),
+                    domain = c("10000 ~ 20000",
+                               "20000 ~ 30000",
+                               "30000 ~ 40000",
+                               "40000 ~ 50000",
+                               "50000 ~ 60000",
+                               "60000 ~ 80000",
+                               "80000 ~ 100000",
+                               "100000 ~ 200000"
+                                           ))
+```
+
+
+```{r, echo = FALSE}
+bj <- split(beijing_housing_price_2018, beijing_housing_price_2018$price.level)
+
+b1 <- leaflet() %>%
+  addTiles()
+
+popup1 = paste0( "Total Price (in CNY): ",
+                beijing_housing_price_2018$totalPrice/100,
+                "billion",
+                "<br>",
+                "Size (in square metre):",
+                beijing_housing_price_2018$square
+                )
+names(bj) %>%
+  purrr::walk(function(df) {
+    b1 <<- b1 %>%
+      addCircleMarkers(data = bj[[df]],
+                       lng = ~Lng, lat = ~Lat,
+                       popup = popup,
+                       group = df,
+                       color = ~pal(price.level),
+                       labelOptions = labelOptions(noHide = F,
+                                                  direction = "auto"))
+      })
+
+b1 %>%
+  addLayersControl(
+    overlayGroups = names(bj),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+```
+
