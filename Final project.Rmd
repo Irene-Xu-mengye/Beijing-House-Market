@@ -1,0 +1,212 @@
+---
+title: "Beijing second-handed house market"
+author: "Allison Xia, Erin Wang, Irene Xu"
+date: "2021/5/21"
+output:
+  html_document:
+    highlight: tango
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false 
+    df_print: kable
+---
+
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+# Set R chunk default options:
+# -do not output all R messages in html report
+# -do not output all R warnings in html report
+# -set default figure widths and heights for all code blocks, unless you 
+#  override them
+knitr::opts_chunk$set(
+  message = FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2
+)
+```
+The Beijing House Market has been a hot topic for the past few years as it remains one of the most populated areas in China. We have decided to analyze the housing market trends from 2010-2018. Our website is convenient for buyers who are interested in buying property for private use and investors who are looking to make profit. By analyzing different factors, buyers will be able to find a property that meets their needs. 
+
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(leaflet)
+library(sf)
+library(ggmap)
+library(readr)
+library(XML)
+library(shiny)
+library(lubridate)
+library(plotly)
+```
+
+
+```{r, echo=FALSE}
+beijing_housing_price <- read_csv("data.csv") %>% 
+  mutate(year = as.character(year(tradeTime))) %>% 
+  mutate(district = case_when(district == 1 ~ "DongCheng",
+                              district == 2 ~ "FengTai",
+                              district == 3 ~ "DaXing",
+                              district == 4 ~ "FaXing",
+                              district == 5 ~ "FangShang",
+                              district == 6 ~ "ChangPing",
+                              district == 7 ~ "ChaoYang",
+                              district == 8 ~ "HaiDian",
+                              district == 9 ~ "ShiJingShan",
+                              district == 10 ~ "XiCheng",
+                              district == 11 ~ "TongZhou",
+                              district == 12 ~ "ShunYi",
+                              district == 13 ~ "MenTouGou"))
+```
+
+
+```{r, echo=FALSE}
+beijing_housing_price_2018 <- beijing_housing_price %>% 
+  filter(tradeTime >= "2018-1-1") %>% 
+  dplyr::mutate(price.level = cut(price, c(10000, 20000, 30000, 40000, 50000, 60000, 80000, 100000, 200000),
+                                
+                                labels = c("10000 ~ 20000",
+                                           "20000 ~ 30000",
+                                           "30000 ~ 40000",
+                                           "40000 ~ 50000",
+                                           "50000 ~ 60000",
+                                           "60000 ~ 80000",
+                                           "80000 ~ 100000",
+                                           "100000 ~ 200000"
+                                           )))
+```
+## Housing Price Per Square Meter Over Years
+```{r, echo = FALSE}
+medians_over_year <- beijing_housing_price %>% 
+  group_by(year) %>% 
+  summarize(median = median(price)) 
+```
+
+```{r,echo = FALSE}
+ggplot(medians_over_year, aes(x = as.numeric(year), y = median))+
+  geom_line() +
+  labs(title = "Median Price per square meter in Beijing over years",
+       x = "Year",
+       y = "Median Price per square meter")
+```
+
+
+Within just 8 years, property prices have almost tripled in Beijing, symbolizing Beijing’s popularity for house buyers. In 2010, the average price for a single square meter was below 20,000; however, in 2018 the average price was well over 50,000; prices even hit 60,000 yuan in 2017!  There was a little fall starting 2017, due to the government interfering and managing house prices.  This makes 2018 a relatively good year to purchase property because prices are not skyrocketing through the roof. Furthermore, the policies of the government has implement ensure it’s unlikely for the housing prices to collapse anytime soon. The government would probably want to see the price increase steadily over time, signaling a growing economy. Therefore, it’s possible that the price would rise steadily in small amounts over the next few years.
+
+
+
+This makes 2018 a relatively good year to purchase property because prices are not skyrocketing through the roof. Furthermore, the possibility of the government implementing new policies on the housing market within a short time, such as a few years, is relatively low, so it’s unlikely for the housing prices to collapse. Besides, the government would probably want to see the price increase steadily over time, signaling a growing economy. Therefore, it’s possible that the price would rise in small amounts over the next few years.
+
+## Price Distribution in 2018
+```{r, echo = FALSE}
+ggplot(beijing_housing_price_2018, aes(y = price)) +
+  geom_histogram()+
+  labs(title = "Price Distribution in 2018",
+       x = "Number of Houses",
+       y = "Price per square meter (in CNY)")
+```
+
+
+In this histogram, we can see the distribution of housing prices (per square meter) in 2018. The average is around 50,000 yuan per square meter, with over 60 properties available around this price point. There are only about 10% of the available properties that are outliers, these properties may be special districts or have other types of functions beyond private usage. The government has kept strict regulations that have allowed prices to be concentrated at a reasonable price point. This graph is only showing the price of a square meter, so depending on the size of the property the total price will look different.
+
+## Prices by district in 2018
+```{r, echo=FALSE}
+ggplot(beijing_housing_price_2018, aes(reorder(x= district, -price), y=price, color = district))+
+  geom_boxplot() + 
+  labs(title = "Prices per square meter by District", x = "District", y =" Price Per Sq Meter")+coord_flip() 
+```
+
+Within this boxplot reveals the housing prices range for each district in 2018 Beijing, buyers can get an idea of locations of houses that match their budgets easily. The middle line in the boxes is median price for each district; box accounts for the middle 50% of the housing prices within the district; the two lines stretching to the side show the minimum and maximum of the house prices except outliers. There are also dots that symbolizes outliers. People with a tight budget can consider houses in DaXing, ShunYi, Faxing, etc. These districts are the suburbs of the city. Living in these districts might be inconvenient considering the long distance to the city center, but their housing prices are much lower than those in central areas such as Xicheng and DongCheng districts.
+
+## Trends of Growth of Property Value By District
+```{r, echo=FALSE}
+medians<- beijing_housing_price %>% 
+  group_by(year, district) %>% 
+  summarize(median = median(price)) 
+```
+
+```{r, echo = FALSE}
+line <-ggplot(data = medians, aes(x = as.numeric(year), y = median, color = district))+
+  geom_line()+
+  labs(title = "Growth of property value by District",
+       x = "Year",
+       y = "Price per square meter (in CNY)")
+```
+
+```{r, echo = FALSE}
+ggplotly(line)
+```
+
+
+From 2010 to 2018, the prices for 13 districts have been doubled or tripled, indicating that the price of houses in Beijing rose significantly no matter where houses were located. Noticeably, the growth of prices of houses in DongCheng and XiCheng districts has been the steepest from 2015 to 2017. It makes sense that these two districts have the highest housing prices with the fastest-growing rate. DongCheng District is the historical center of Beijing, while XiCHeng district is the most bustling area in Beijing where many financial institutions and shopping centers are located.
+
+
+## Interactive Map for Buyers To Select Houses in Their Budgets
+By clicking the boxes on the right of the map, you can easily select/unselect houses in your budget per square meter. The darker a circle is, the higher the price per square meter is. You can also left-click the circles on the map so that you will get more information of this specific house. Hope you could use this map to find your idea home!
+```{r, echo = FALSE}
+beijing_housing_price <- beijing_housing_price %>% 
+  mutate(district = case_when(district == 1 ~ "DongCheng",
+                              district == 2 ~ "FengTai",
+                              district == 3 ~ "DaXing",
+                              district == 4 ~ "FaXing",
+                              district == 5 ~ "FangShang",
+                              district == 6 ~ "ChangPing",
+                              district == 7 ~ "ChaoYang",
+                              district == 8 ~ "HaiDian",
+                              district == 9 ~ "ShiJingShan",
+                              district == 10 ~ "XiCheng",
+                              district == 11 ~ "TongZhou",
+                              district == 12 ~ "ShunYi",
+                              district == 13 ~ "MenTouGou"))
+```
+
+```{r, echo = FALSE}
+pal <- colorFactor(c("#dd3497",
+                     "#ae017e",
+                     "#7a0177",
+                     "#feebe2",
+                     "#fcc5c0",
+                     "#fa9fb5",
+                     "#f768a1"),
+                    domain = c("10000 ~ 20000",
+                               "20000 ~ 30000",
+                               "30000 ~ 40000",
+                               "40000 ~ 50000",
+                               "50000 ~ 60000",
+                               "60000 ~ 80000",
+                               "80000 ~ 100000",
+                               "100000 ~ 200000"
+                                           ))
+```
+
+```{r, echo = FALSE}
+bj <- split(beijing_housing_price_2018, beijing_housing_price_2018$price.level)
+
+b1 <- leaflet() %>%
+  addTiles()
+
+popup1 = paste0( "Total Price (in CNY): ",
+                beijing_housing_price_2018$totalPrice/100,
+                "billion",
+                "<br>",
+                "Size (in square metre):",
+                beijing_housing_price_2018$square
+                )
+names(bj) %>%
+  purrr::walk(function(df) {
+    b1 <<- b1 %>%
+      addCircleMarkers(data = bj[[df]],
+                       lng = ~Lng, lat = ~Lat,
+                       popup = popup1,
+                       group = df,
+                       color = ~pal(price.level),
+                       labelOptions = labelOptions(noHide = F,
+                                                  direction = "auto"))
+      })
+
+b1 %>%
+  addLayersControl(
+    overlayGroups = names(bj),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+```
+
